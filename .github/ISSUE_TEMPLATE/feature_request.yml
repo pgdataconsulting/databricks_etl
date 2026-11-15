@@ -1,0 +1,21 @@
+name: Feature request
+description: An operation, setting or integration the framework should have
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The pipeline you are trying to build
+      description: What you need to express, and what you do today instead.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How it could look in YAML
+      render: yaml
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: For example a `sql` step, a nested pipeline, or an operation plugin in your own package.

@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not behave the way the documentation says it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Smallest configuration that shows it
+      description: Remove everything that is not needed to reproduce the problem. Do not paste credentials or real data.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error message or run summary
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Framework version
+      description: Output of `etl-framework --version`
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Where it ran
+      description: For example "local, PySpark 4.0, Python 3.12" or "Databricks serverless" or "Databricks Runtime 16.4 LTS".
+    validations:
+      required: true

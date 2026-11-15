@@ -1,0 +1,112 @@
+# The medallion example as a scheduled job: three YAML pipelines, one task
+# each, run by the framework's `run` command. Adding a pipeline to the
+# platform means adding a YAML file and a task like these; there is no
+# pipeline-specific code to deploy.
+resources:
+  jobs:
+    medallion_orders:
+      name: medallion_orders
+      description: >-
+        Loads orders from bronze to silver (incremental, quarantining bad
+        rows) and publishes daily revenue per customer to gold.
+
+      # Serverless: no cluster to size or patch. STANDARD because this is a
+      # daily batch with no deadline; it starts within minutes and costs less.
+      performance_target: STANDARD
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: 3600
+
+      schedule:
+        quartz_cron_expression: "0 30 5 * * ?"
+        timezone_id: UTC
+
+      parameters:
+        - name: business_date
+          default: "{{job.start_time.iso_date}}"
+        - name: catalog
+          default: ${var.catalog}
+
+      email_notifications:
+        on_failure: ${var.failure_notification_emails}
+        on_duration_warning_threshold_exceeded: ${var.failure_notification_emails}
+        no_alert_for_skipped_runs: true
+      health:
+        rules:
+          - metric: RUN_DURATION_SECONDS
+            op: GREATER_THAN
+            value: 1800
+
+      tags:
+        project: databricks-yaml-etl
+        environment: ${bundle.target}
+        managed_by: bundle
+        aidevkit_project: ai-dev-kit
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: ${var.serverless_environment_version}
+            dependencies:
+              - ../dist/*.whl
+
+      tasks:
+        # Sample data, so the example runs without a source system. In a real
+        # deployment this task is the ingestion from the landing zone.
+        - task_key: seed_sample_data
+          environment_key: default
+          python_wheel_task:
+            package_name: databricks_yaml_etl
+            entry_point: etl_framework
+            parameters:
+              - run
+              - ${workspace.file_path}/configs/medallion/seed_sample_data.yaml
+              - --param
+              - catalog={{job.parameters.catalog}}
+              - --param
+              - business_date={{job.parameters.business_date}}
+              - --param
+              - environment=${bundle.target}
+              - --run-id
+              - "{{job.run_id}}-seed_sample_data"
+
+        - task_key: orders_silver
+          depends_on:
+            - task_key: seed_sample_data
+          environment_key: default
+          # The silver load is idempotent (watermark + merge), so a retry
+          # after a transient failure cannot double-load.
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          python_wheel_task:
+            package_name: databricks_yaml_etl
+            entry_point: etl_framework
+            parameters:
+              - run
+              - ${workspace.file_path}/configs/medallion/orders_silver.yaml
+              - --param
+              - catalog={{job.parameters.catalog}}
+              - --param
+              - environment=${bundle.target}
+              - --run-id
+              - "{{job.run_id}}-orders_silver"
+
+        - task_key: customer_revenue_gold
+          depends_on:
+            - task_key: orders_silver
+          environment_key: default
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          python_wheel_task:
+            package_name: databricks_yaml_etl
+            entry_point: etl_framework
+            parameters:
+              - run
+              - ${workspace.file_path}/configs/medallion/customer_revenue_gold.yaml
+              - --param
+              - catalog={{job.parameters.catalog}}
+              - --param
+              - environment=${bundle.target}
+              - --run-id
+              - "{{job.run_id}}-customer_revenue_gold"

@@ -1,0 +1,39 @@
+# Example pipeline: hands its orders to the reusable standardize_orders
+# config (a nested pipeline run via run_config), then publishes the result.
+# Run with:
+#   run_pipeline(config_path="configs/orders_with_standardization.yaml",
+#                parameters={"business_date": "2026-07-07", "environment": "dev"})
+spec_version: "1.0"
+process_name: orders_with_standardization
+
+parameters:
+  business_date: null   # required at runtime
+  environment: "dev"
+
+settings:
+  log_row_counts: true
+
+steps:
+  - name: read_orders
+    type: read
+    format: delta
+    path: abfss://datalake/silver/orders
+    schema_ref: silver/orders
+    alias: orders
+
+  - name: standardize
+    type: run_config
+    config_path: standardize_orders.yaml   # relative to this config
+    parameters:
+      business_date: "${business_date}"
+    inputs:
+      raw_orders: orders          # child alias <- parent DataFrame
+    outputs:
+      orders_std: standardized    # parent alias <- child DataFrame
+
+  - name: write_output
+    type: write
+    input: orders_std
+    format: delta
+    mode: overwrite
+    path: abfss://datalake/gold/orders_standardized

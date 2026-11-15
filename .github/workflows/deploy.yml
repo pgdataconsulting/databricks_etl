@@ -1,0 +1,65 @@
+name: Deploy
+
+# Promotion model:
+#   push to main       -> the `test` environment, followed by a run of the job there
+#   published release  -> the `prod` environment (protect it with required reviewers)
+#   manual dispatch    -> either, on demand
+#
+# Authentication is GitHub OIDC workload identity federation: the deployer
+# service principal trusts this repository's environments, so no secret is
+# stored anywhere. Terraform creates the service principal and the federation
+# policy (infra/terraform/stacks/governance); see docs/deployment.md.
+#
+# Each GitHub environment needs these variables (not secrets):
+#   DATABRICKS_HOST          workspace URL            (Terraform output workspace_url)
+#   DATABRICKS_CLIENT_ID     deployer application id  (Terraform output deployer_application_id)
+#   RUNNER_APPLICATION_ID    runner application id    (Terraform output runner_application_id)
+# and the repository variable DEPLOY_ENABLED=true switches the workflow on,
+# so a fork or a fresh clone without a workspace does not fail on every push.
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy to
+        type: choice
+        options: [test, prod]
+        default: test
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.target || (github.event_name == 'release' && 'prod') || 'test' }}
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target || (github.event_name == 'release' && 'prod') || 'test' }}
+    # One deployment per environment at a time, and never cancel one midway.
+    concurrency:
+      group: deploy-${{ github.event.inputs.target || (github.event_name == 'release' && 'prod') || 'test' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write   # lets the Databricks CLI request the OIDC token it exchanges
+    env:
+      TARGET: ${{ github.event.inputs.target || (github.event_name == 'release' && 'prod') || 'test' }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      BUNDLE_VAR_runner_service_principal: ${{ vars.RUNNER_APPLICATION_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: databricks/setup-cli@9625fdde9ba2607df0087e0d3ec7449198bf2180 # v1.23.0
+      - name: Validate the bundle against the workspace
+        run: databricks bundle validate --strict -t "$TARGET"
+      - name: Deploy
+        run: databricks bundle deploy -t "$TARGET"
+      - name: Run the job once as a smoke test
+        if: env.TARGET == 'test'
+        run: databricks bundle run medallion_orders -t "$TARGET"

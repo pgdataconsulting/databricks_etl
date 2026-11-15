@@ -1,0 +1,32 @@
+# Install with `make hooks` (or `pre-commit install`).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # The same gate CI applies: a config that does not validate cannot be
+      # committed. It runs the package from the working tree in an
+      # environment of its own that holds only PyYAML, so it works whether or
+      # not a virtualenv is active, and proves again that PySpark is not needed.
+      - id: validate-pipeline-configs
+        name: validate pipeline configs
+        entry: python -m etl_framework validate
+        language: python
+        additional_dependencies: ["PyYAML>=6.0"]
+        files: ^configs/.*\.ya?ml$

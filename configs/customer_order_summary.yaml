@@ -1,0 +1,47 @@
+# Example pipeline: aggregates orders per customer, deduplicating first.
+spec_version: "1.0"
+process_name: customer_order_summary
+
+parameters:
+  business_date: null
+
+steps:
+  - name: read_orders
+    type: read
+    format: parquet
+    path: abfss://datalake/silver/orders
+    alias: orders
+
+  - name: deduplicate_orders
+    type: deduplicate
+    input: orders
+    partition_by:
+      - order_id
+    order_by:
+      - "updated_at desc"
+    output: unique_orders
+
+  - name: add_audit_columns
+    type: add_columns
+    input: unique_orders
+    columns:
+      business_date: "'${business_date}'"
+      load_timestamp: "current_timestamp()"
+    output: orders_enriched
+
+  - name: summarize_orders
+    type: aggregate
+    input: orders_enriched
+    group_by:
+      - customer_id
+    aggregations:
+      total_amount: "sum(order_amount)"
+      order_count: "count(*)"
+    output: customer_summary
+
+  - name: write_summary
+    type: write
+    input: customer_summary
+    format: table
+    mode: overwrite
+    table: gold.customer_order_summary

@@ -1,0 +1,64 @@
+# Medallion example, step 0: sample data.
+#
+# Generates a small raw dataset so the example runs end to end without a
+# source system. It deliberately contains what real feeds contain: a
+# superseded version of an order, a negative amount, a missing customer, and
+# an order from a customer nobody has heard of. In a real deployment this
+# config is replaced by `read` steps over the landing zone or a JDBC source.
+spec_version: "1.0"
+process_name: medallion_seed_sample_data
+
+parameters:
+  catalog: spark_catalog   # Unity Catalog name on Databricks, e.g. etl_dev
+  business_date: null      # required at runtime, yyyy-MM-dd
+
+settings:
+  allow_sql: true          # generating literal rows needs a free-form query
+  log_row_counts: true
+
+steps:
+  - name: generate_orders
+    type: sql
+    query: >
+      SELECT CAST(order_id AS INT) AS order_id,
+             CAST(customer_id AS INT) AS customer_id,
+             CAST(order_date AS DATE) AS order_date,
+             CAST(order_amount AS DOUBLE) AS order_amount,
+             status,
+             CAST(updated_at AS TIMESTAMP) AS updated_at
+      FROM VALUES
+        (1001, 1,    '${business_date}', 120.50, 'NEW',       '${business_date} 07:00:00'),
+        (1001, 1,    '${business_date}', 120.50, 'SHIPPED',   '${business_date} 08:15:00'),
+        (1002, 2,    '${business_date}',  75.00, 'NEW',       '${business_date} 09:30:00'),
+        (1003, 1,    '${business_date}', 310.00, 'SHIPPED',   '${business_date} 10:05:00'),
+        (1004, 3,    '${business_date}', -15.00, 'NEW',       '${business_date} 10:40:00'),
+        (1005, NULL, '${business_date}',  42.00, 'NEW',       '${business_date} 11:00:00'),
+        (1006, 2,    '${business_date}',  18.25, 'CANCELLED', '${business_date} 11:20:00'),
+        (1007, 9,    '${business_date}',  64.00, 'SHIPPED',   '${business_date} 12:45:00')
+        AS orders(order_id, customer_id, order_date, order_amount, status, updated_at)
+    output: orders_raw
+
+  - name: write_orders
+    type: write
+    input: orders_raw
+    format: table
+    mode: overwrite
+    table: ${catalog}.bronze.orders_raw
+
+  - name: generate_customers
+    type: sql
+    query: >
+      SELECT CAST(customer_id AS INT) AS customer_id, customer_name, country
+      FROM VALUES
+        (1, 'Alice Novak', 'PL'),
+        (2, 'Bruno Costa', 'PT'),
+        (3, 'Chen Wei',    'SG')
+        AS customers(customer_id, customer_name, country)
+    output: customers_raw
+
+  - name: write_customers
+    type: write
+    input: customers_raw
+    format: table
+    mode: overwrite
+    table: ${catalog}.bronze.customers_raw

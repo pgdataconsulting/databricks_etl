@@ -1,0 +1,28 @@
+# Reusable nested pipeline: standardizes an orders DataFrame provided by the
+# calling configuration. Not runnable on its own (it declares required
+# inputs); run it within another config via a run_config step — see
+# configs/orders_with_standardization.yaml.
+spec_version: "1.0"
+process_name: standardize_orders
+
+# DataFrames the calling run_config step must provide via its `inputs` mapping.
+inputs: [raw_orders]
+
+parameters:
+  business_date: null   # required at runtime
+
+steps:
+  - name: filter_business_date
+    type: filter
+    input: raw_orders
+    condition: "order_date = '${business_date}'"
+    output: filtered
+
+  - name: normalize
+    type: expression
+    input: filtered
+    expressions:
+      order_id: "cast(order_id as string)"
+      order_amount: "cast(order_amount as decimal(18,2))"
+      order_date: "to_date(order_date, 'yyyy-MM-dd')"
+    output: standardized

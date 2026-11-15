@@ -1,0 +1,8 @@
+# Review is requested from the code owners on every pull request.
+*                   @pgdataconsulting
+
+# Changes here alter what is deployed and who can access what.
+/infra/             @pgdataconsulting
+/databricks.yml     @pgdataconsulting
+/resources/         @pgdataconsulting
+/.github/workflows/ @pgdataconsulting

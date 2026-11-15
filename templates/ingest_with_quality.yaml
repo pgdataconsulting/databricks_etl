@@ -1,0 +1,17 @@
+# Reusable ingest template: read a delta source and gate it on basic quality.
+# Produces the DataFrame `${alias}_checked` for downstream steps.
+template_name: ingest_with_quality
+template_parameters: [source_path, alias]
+steps:
+  - name: read_${alias}
+    type: read
+    format: delta
+    path: ${source_path}
+    alias: ${alias}
+  - name: check_${alias}
+    type: quality
+    input: ${alias}
+    on_failure: fail
+    checks:
+      - {type: row_count, min: 1}
+    output: ${alias}_checked

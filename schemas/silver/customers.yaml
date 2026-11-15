@@ -1,0 +1,6 @@
+# Schema contract for the silver customers dataset.
+dataset: silver.customers
+columns:
+  - {name: customer_id, type: int, nullable: false}
+  - {name: customer_name, type: string, nullable: true}
+  - {name: email, type: string, nullable: true}

@@ -1,0 +1,10 @@
+# Schema contract for the silver orders table of the medallion example.
+# Not strict: the load adds its own audit columns (_run_id, _load_timestamp).
+dataset: silver.orders
+columns:
+  - {name: order_id, type: int, nullable: false}
+  - {name: customer_id, type: int, nullable: false}
+  - {name: order_date, type: date, nullable: true}
+  - {name: order_amount, type: double, nullable: true}
+  - {name: status, type: string, nullable: true}
+  - {name: updated_at, type: timestamp, nullable: true}

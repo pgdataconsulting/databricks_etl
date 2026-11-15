@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/pgdataconsulting/databricks_etl/security/advisories/new
+    about: Report vulnerabilities privately, not as a public issue.
+  - name: User guide
+    url: https://github.com/pgdataconsulting/databricks_etl/blob/main/docs/usage.md
+    about: Every operation, setting and feature, with examples.

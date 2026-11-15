@@ -1,0 +1,4 @@
+# Generated from the platform stack's outputs (terraform output -json
+# governance_inputs). Holds subscription and resource IDs of a real
+# environment, so it stays local like the other tfvars files.
+*.tfvars.json

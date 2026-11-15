@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Test, lint and type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Local Spark / Delta state
+spark-warehouse/
+metastore_db/
+derby.log
+artifacts/
+
+# Databricks Asset Bundle state
+.databricks/
+
+# Terraform: state and local overrides stay out of Git; lock files are committed
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.auto.tfvars
+*.tfvars
+!*.tfvars.example
+*.backend.hcl
+!*.backend.hcl.example
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store

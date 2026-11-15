@@ -1,0 +1,85 @@
+# Example pipeline: joins daily orders with customers and publishes a gold table.
+# Run with:
+#   run_pipeline(config_path="configs/customer_orders.yaml",
+#                parameters={"business_date": "2026-07-07", "environment": "dev"})
+spec_version: "1.0"
+process_name: customer_orders_etl
+
+parameters:
+  business_date: null   # required at runtime
+  environment: "dev"
+
+settings:
+  log_row_counts: true
+
+steps:
+  - name: read_customers
+    type: read
+    format: delta
+    path: abfss://datalake/silver/customers
+    schema_ref: silver/customers
+    alias: customers
+
+  - name: read_orders
+    type: read
+    format: delta
+    path: abfss://datalake/silver/orders
+    schema_ref: silver/orders
+    alias: orders
+
+  - name: filter_orders
+    type: filter
+    input: orders
+    condition: "order_date = '${business_date}'"
+    output: filtered_orders
+
+  - name: join_customers_orders
+    type: join
+    left: filtered_orders
+    right: customers
+    join_type: left
+    condition:
+      - "filtered_orders.customer_id = customers.customer_id"
+    output: customer_orders
+
+  - name: enrich_orders
+    type: expression
+    input: customer_orders
+    expressions:
+      customer_name_upper: "upper(customer_name)"
+      load_timestamp: "current_timestamp()"
+      business_date: "to_date('${business_date}', 'yyyy-MM-dd')"
+    output: enriched_orders
+
+  - name: select_columns
+    type: select
+    input: enriched_orders
+    columns:
+      - customer_id
+      - customer_name
+      - order_id
+      - order_date
+      - order_amount
+      - business_date
+    output: final_dataset
+
+  - name: check_quality
+    type: quality
+    input: final_dataset
+    on_failure: fail
+    checks:
+      - {type: not_null, columns: [customer_id, order_id]}
+      - {type: unique, columns: [order_id]}
+      - {type: expression, condition: "order_amount >= 0", name: non_negative_amount}
+      - {type: row_count, min: 1}
+    output: checked_dataset
+
+  - name: write_output
+    type: write
+    input: checked_dataset
+    format: delta
+    mode: overwrite
+    partition_by:
+      - business_date
+    schema_ref: gold/customer_orders
+    path: abfss://datalake/gold/customer_orders

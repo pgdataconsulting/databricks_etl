@@ -1,0 +1,103 @@
+# Declarative Automation Bundle (formerly Databricks Asset Bundle).
+#
+# The bundle owns the workloads: it builds the framework wheel, uploads the
+# pipeline configurations, and deploys the jobs that run them. The platform
+# underneath (workspace, Unity Catalog, identities, grants) is Terraform's:
+# see infra/terraform. Deployment guide: docs/deployment.md.
+bundle:
+  name: databricks_yaml_etl
+
+include:
+  - resources/*.yml
+
+artifacts:
+  etl_framework:
+    type: whl
+    build: uv build --wheel
+
+# Everything Git tracks is uploaded next to the jobs by default. A job only
+# reads configs/, schemas/ and templates/ (and notebooks/ when triggered from
+# Azure Data Factory), so the rest stays out of the workspace.
+sync:
+  exclude:
+    - .github/**
+    - docs/**
+    - examples/**
+    - infra/**
+    - tests/**
+
+variables:
+  catalog:
+    description: Unity Catalog catalog the pipelines read and write (Terraform output `catalog_name`).
+  runner_service_principal:
+    description: >-
+      Application ID of the service principal that jobs run as in shared
+      environments (Terraform output `runner_application_id`). Required for
+      the test and prod targets; CI sets it from the GitHub environment.
+    default: ""
+  admins_group:
+    description: Group that manages the deployed jobs (Terraform output `group_names`).
+    default: etl-platform-admins
+  engineers_group:
+    description: Group of the engineers who develop the pipelines (Terraform output `group_names`).
+    default: etl-data-engineers
+  failure_notification_emails:
+    description: Addresses notified when a job run fails or runs long.
+    type: complex
+    default: []
+  serverless_environment_version:
+    description: Serverless environment version the wheel tasks run in.
+    default: "5"
+
+# The workspace is not named here. Locally it comes from the CLI profile
+# (`databricks bundle deploy -t dev --profile <name>`); in CI from the
+# DATABRICKS_HOST variable of the GitHub environment.
+targets:
+  # A developer's own copy: resources are prefixed with the user's name,
+  # schedules are paused, and the jobs run as that user.
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: etl_dev
+
+  # Shared environments are deployed by CI as the deployer service principal
+  # and run as the runner service principal. The bundle lives in the
+  # deployer's own workspace folder, not under /Workspace/Shared: a job that
+  # runs with the runner's privileges must not read its configuration from a
+  # folder that every workspace user can write to.
+  test:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.runner_service_principal}
+    variables:
+      catalog: etl_test
+    permissions:
+      - group_name: ${var.admins_group}
+        level: CAN_MANAGE
+      - group_name: ${var.engineers_group}
+        level: CAN_RUN
+      # The jobs read their configuration and wheel from the bundle folder as
+      # the runner, which is not the identity that deployed them.
+      - service_principal_name: ${var.runner_service_principal}
+        level: CAN_VIEW
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.runner_service_principal}
+    variables:
+      catalog: etl_prod
+    permissions:
+      - group_name: ${var.admins_group}
+        level: CAN_MANAGE
+      # Engineers can see what ran and why it failed; they change production
+      # through a pull request, not through the workspace.
+      - group_name: ${var.engineers_group}
+        level: CAN_VIEW
+      - service_principal_name: ${var.runner_service_principal}
+        level: CAN_VIEW

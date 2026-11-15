@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  # Actions are pinned to commit SHAs; Dependabot moves the pins.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: terraform
+    directories:
+      - /infra/terraform/stacks/platform
+      - /infra/terraform/stacks/governance
+    schedule:
+      interval: weekly
+    groups:
+      terraform:
+        patterns: ["*"]

@@ -1,0 +1,64 @@
+# Medallion example, step 1: bronze -> silver.
+#
+# An incremental, idempotent load: only orders changed since the last
+# successful run are read (watermark), the latest version of each order wins
+# (deduplicate), rows that break the rules are set aside rather than loaded
+# or dropped (quarantine), and the result is upserted (merge). A failed run
+# leaves the watermark where it was, so the next run repeats the same window.
+spec_version: "1.0"
+process_name: medallion_orders_silver
+
+parameters:
+  catalog: spark_catalog   # Unity Catalog name on Databricks, e.g. etl_dev
+  environment: dev
+
+settings:
+  log_row_counts: true
+  audit_columns: [_run_id, _load_timestamp]
+  audit:
+    enabled: true
+    schema: ${catalog}.etl_audit
+  watermark:
+    enabled: true
+    source: new_orders
+    column: updated_at
+    initial: "1900-01-01 00:00:00"
+    table: ${catalog}.etl_state.watermarks
+
+steps:
+  - name: read_bronze_orders
+    type: read
+    format: table
+    table: ${catalog}.bronze.orders_raw
+    alias: orders_raw
+
+  - name: only_changed_orders
+    type: filter
+    input: orders_raw
+    condition: "updated_at > '${watermark}'"
+    output: new_orders
+
+  - name: latest_version_per_order
+    type: deduplicate
+    input: new_orders
+    partition_by: [order_id]
+    order_by: ["updated_at desc"]
+    output: latest_orders
+
+  - name: check_orders
+    type: quality
+    input: latest_orders
+    on_failure: quarantine
+    quarantine_table: ${catalog}.quarantine.orders
+    checks:
+      - {type: not_null, columns: [order_id, customer_id]}
+      - {type: accepted_values, column: status, values: [NEW, SHIPPED, CANCELLED]}
+      - {type: expression, condition: "order_amount >= 0", name: non_negative_amount}
+    output: clean_orders
+
+  - name: upsert_silver_orders
+    type: merge
+    input: clean_orders
+    merge_keys: [order_id]
+    table: ${catalog}.silver.orders
+    schema_ref: medallion/silver_orders

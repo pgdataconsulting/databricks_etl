@@ -1,0 +1,17 @@
+# Remote state for the platform stack.
+#
+# Copy to <env>.backend.hcl (ignored by Git), replace the placeholders, then run:
+#   terraform init -backend-config=<env>.backend.hcl
+#
+# The storage account and container must exist before the first init; these
+# stacks do not manage them. With use_azuread_auth the identity that runs
+# Terraform needs Storage Blob Data Contributor on the container, and no
+# account key is used.
+
+tenant_id            = "00000000-0000-0000-0000-000000000000"
+storage_account_name = "sttfstateexample"
+container_name       = "tfstate"
+use_azuread_auth     = true
+
+# One state file per stack and environment. Change dev to test or prod.
+key = "databricks-etl/dev/platform.tfstate"

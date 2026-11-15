@@ -1,0 +1,52 @@
+# Platform stack, prod environment.
+# Copy to prod.tfvars (ignored by Git) and replace the placeholders.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+environment     = "prod"
+location        = "westeurope"
+
+# Makes the storage account and Key Vault names globally unique. Choose once.
+name_suffix = "p9k3"
+
+# Zone and geo redundant. Needs a region with availability zones.
+storage_replication_type           = "GZRS"
+storage_soft_delete_retention_days = 30
+
+# Only the listed networks reach the Key Vault data plane. 203.0.113.0/24 is a
+# documentation range: replace it with the egress range of the people and
+# pipelines that maintain the secrets.
+key_vault_firewall = {
+  allowed_ip_ranges = ["203.0.113.0/24"]
+}
+
+# Entra object ID of the group that maintains source-system credentials.
+key_vault_secrets_officer_principal_ids = [
+  "00000000-0000-0000-0000-000000000000",
+]
+
+# The storage account and the workspace keep their public endpoints in this
+# example because the stack creates no virtual network. To close them, deploy
+# the workspace into an existing network and restrict the storage account to
+# its subnets. Read "Network exposure" in the README first: private endpoints
+# and access for serverless compute are not created by this stack.
+#
+# workspace_public_network_access_enabled = false
+# workspace_vnet_injection = {
+#   virtual_network_id                = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-prod/providers/Microsoft.Network/virtualNetworks/vnet-data-prod"
+#   public_subnet_name                = "snet-dbw-host"
+#   private_subnet_name               = "snet-dbw-container"
+#   public_subnet_nsg_association_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-prod/providers/Microsoft.Network/virtualNetworks/vnet-data-prod/subnets/snet-dbw-host"
+#   private_subnet_nsg_association_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-prod/providers/Microsoft.Network/virtualNetworks/vnet-data-prod/subnets/snet-dbw-container"
+#   required_nsg_rules                = "NoAzureDatabricksRules"
+# }
+# storage_firewall = {
+#   allowed_subnet_ids = [
+#     "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-prod/providers/Microsoft.Network/virtualNetworks/vnet-data-prod/subnets/snet-dbw-host",
+#     "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-prod/providers/Microsoft.Network/virtualNetworks/vnet-data-prod/subnets/snet-dbw-container",
+#   ]
+# }
+
+tags = {
+  cost_center         = "0000"
+  data_classification = "confidential"
+}

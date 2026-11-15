@@ -1,0 +1,43 @@
+# Example pipeline showcasing templates, environment overrides, and lineage.
+spec_version: "1.0"
+process_name: orders_daily_snapshot
+
+parameters:
+  business_date: null
+  environment: "dev"
+  target_path: "abfss://dev-datalake/gold/orders_snapshot"
+
+settings:
+  log_row_counts: true
+  lineage:
+    enabled: true
+    transport: console
+    namespace: datalake
+
+environments:
+  prod:
+    parameters:
+      target_path: "abfss://prod-datalake/gold/orders_snapshot"
+    settings:
+      log_row_counts: false
+      audit:
+        enabled: true
+
+steps:
+  - use_template: ingest_with_quality
+    with:
+      source_path: abfss://datalake/silver/orders
+      alias: orders
+
+  - name: filter_business_date
+    type: filter
+    input: orders_checked
+    condition: "order_date = '${business_date}'"
+    output: daily_orders
+
+  - name: write_snapshot
+    type: write
+    input: daily_orders
+    format: delta
+    mode: overwrite
+    path: "${target_path}"

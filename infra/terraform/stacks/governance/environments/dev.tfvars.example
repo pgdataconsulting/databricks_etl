@@ -1,0 +1,30 @@
+# Governance stack, dev environment.
+# Copy to dev.tfvars (ignored by Git) and replace the placeholders.
+#
+# The workspace, access connector and storage inputs are not set here. They
+# come from the platform stack:
+#   terraform -chdir=../platform output -json governance_inputs > environments/dev.platform.tfvars.json
+
+databricks_account_id = "00000000-0000-0000-0000-000000000000"
+environment           = "dev"
+
+# The role groups are account-wide and shared by every environment, so exactly
+# one environment may create them. Here that is dev; test and prod look them up.
+create_groups = true
+
+# Engineers build and debug pipelines here: read, write and create in every
+# schema, read the landing zone and the secret scope.
+data_engineer_access = "read_write"
+
+# GitHub repository and environment whose deploy job may sign in as the
+# deployer. github_environment defaults to the environment name.
+github_organization = "example-org"
+github_repository   = "example-repo"
+
+# Set the subject in full when the repository uses GitHub's immutable subject
+# format (created, renamed or transferred after 15 July 2026). See the README
+# for how to read the real value from a workflow run.
+# github_oidc_subject = "repo:example-org@1234567/example-repo@7654321:environment:dev"
+
+# A small serverless SQL warehouse for ad-hoc queries.
+enable_sql_warehouse = false

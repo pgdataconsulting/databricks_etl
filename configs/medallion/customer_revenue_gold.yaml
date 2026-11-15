@@ -1,0 +1,77 @@
+# Medallion example, step 2: silver -> gold.
+#
+# Publishes daily revenue per customer. The gold table has a strict schema
+# contract: a column that is not in the contract cannot reach consumers, and
+# the checks run before anything is written.
+spec_version: "1.0"
+process_name: medallion_customer_revenue_gold
+
+parameters:
+  catalog: spark_catalog   # Unity Catalog name on Databricks, e.g. etl_dev
+  environment: dev
+
+settings:
+  log_row_counts: true
+  audit:
+    enabled: true
+    schema: ${catalog}.etl_audit
+
+steps:
+  - name: read_silver_orders
+    type: read
+    format: table
+    table: ${catalog}.silver.orders
+    schema_ref: medallion/silver_orders
+    alias: orders
+
+  - name: read_customers
+    type: read
+    format: table
+    table: ${catalog}.bronze.customers_raw
+    alias: customers
+
+  - name: drop_cancelled_orders
+    type: filter
+    input: orders
+    condition: "status <> 'CANCELLED'"
+    output: active_orders
+
+  - name: add_customer_attributes
+    type: lookup
+    input: active_orders
+    lookup: customers
+    on:
+      customer_id: customer_id
+    select: [customer_name, country]
+    defaults:
+      customer_name: UNKNOWN
+      country: "??"
+    output: orders_enriched
+
+  - name: revenue_per_customer_and_day
+    type: aggregate
+    input: orders_enriched
+    group_by: [order_date, customer_id, customer_name, country]
+    aggregations:
+      order_count: "count(*)"
+      revenue: "round(sum(order_amount), 2)"
+    output: daily_revenue
+
+  - name: check_daily_revenue
+    type: quality
+    input: daily_revenue
+    on_failure: fail
+    checks:
+      - {type: unique, columns: [order_date, customer_id]}
+      - {type: not_null, columns: [order_date, customer_id, revenue]}
+      - {type: expression, condition: "revenue >= 0", name: non_negative_revenue}
+      - {type: row_count, min: 1}
+    output: checked_daily_revenue
+
+  - name: publish_gold
+    type: write
+    input: checked_daily_revenue
+    format: table
+    mode: overwrite
+    table: ${catalog}.gold.customer_daily_revenue
+    schema_ref: medallion/gold_customer_daily_revenue

@@ -1,0 +1,11 @@
+# Schema contract for the published gold table of the medallion example.
+# strict: nothing outside this list may reach consumers.
+dataset: gold.customer_daily_revenue
+strict: true
+columns:
+  - {name: order_date, type: date, nullable: false}
+  - {name: customer_id, type: int, nullable: false}
+  - {name: customer_name, type: string, nullable: true}
+  - {name: country, type: string, nullable: true}
+  - {name: order_count, type: bigint, nullable: false}
+  - {name: revenue, type: double, nullable: false}

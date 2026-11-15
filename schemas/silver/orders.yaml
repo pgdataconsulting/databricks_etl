@@ -1,0 +1,7 @@
+# Schema contract for the silver orders dataset.
+dataset: silver.orders
+columns:
+  - {name: order_id, type: int, nullable: false}
+  - {name: customer_id, type: int, nullable: true}
+  - {name: order_date, type: string, nullable: true}
+  - {name: order_amount, type: double, nullable: true}

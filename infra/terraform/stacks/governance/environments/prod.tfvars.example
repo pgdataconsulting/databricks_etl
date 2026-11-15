@@ -1,0 +1,38 @@
+# Governance stack, prod environment.
+# Copy to prod.tfvars (ignored by Git) and replace the placeholders.
+#
+# The workspace, access connector and storage inputs are not set here. They
+# come from the platform stack:
+#   terraform -chdir=../platform output -json governance_inputs > environments/prod.platform.tfvars.json
+
+databricks_account_id = "00000000-0000-0000-0000-000000000000"
+environment           = "prod"
+
+# Groups are synced from Microsoft Entra ID and only looked up here. Map the
+# roles to the synced names when they follow another convention.
+create_groups = false
+# group_name_overrides = {
+#   platform_admins = "sg-data-platform-admins"
+#   data_engineers  = "sg-data-engineers"
+#   data_analysts   = "sg-data-analysts"
+# }
+
+# Production: engineers read every schema and nothing else. Changes reach
+# production through the pipeline, as the runner service principal.
+data_engineer_access = "read_only"
+
+# GitHub repository and environment whose deploy job may sign in as the
+# deployer. Protect the GitHub environment with required reviewers: it is the
+# gate in front of this identity.
+github_organization = "example-org"
+github_repository   = "example-repo"
+github_environment  = "prod"
+
+# Set the subject in full when the repository uses GitHub's immutable subject
+# format (created, renamed or transferred after 15 July 2026). See the README
+# for how to read the real value from a workflow run.
+# github_oidc_subject = "repo:example-org@1234567/example-repo@7654321:environment:prod"
+
+# Analysts query gold through this warehouse.
+enable_sql_warehouse       = true
+sql_warehouse_cluster_size = "Small"

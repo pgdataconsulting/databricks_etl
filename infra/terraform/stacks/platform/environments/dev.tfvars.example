@@ -1,0 +1,22 @@
+# Platform stack, dev environment.
+# Copy to dev.tfvars (ignored by Git) and replace the placeholders.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+environment     = "dev"
+location        = "westeurope"
+
+# Makes the storage account and Key Vault names globally unique. Choose once.
+name_suffix = "d1x7"
+
+# Locally redundant storage is enough for data that can be reloaded.
+storage_replication_type = "LRS"
+
+# Entra object IDs of the people or group who maintain source-system
+# credentials in the Key Vault.
+key_vault_secrets_officer_principal_ids = [
+  "00000000-0000-0000-0000-000000000000",
+]
+
+tags = {
+  cost_center = "0000"
+}
